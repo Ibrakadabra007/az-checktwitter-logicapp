@@ -1,0 +1,125 @@
+/* 
+  Description: raw json for the ChkEvilTwitter-logicApp, includes actions and API connections
+*/
+
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Condition": {
+                "actions": {
+                    "Compose": {
+                        "inputs": "A potential bad tweet received from :  @{triggerBody()?['UserDetails']}  \nThe Tweet content :  @{triggerBody()?['TweetText']}\nThe sentiment-score was :  @{body('Detect_Sentiment')?['score']}\n",
+                        "runAfter": {},
+                        "type": "Compose"
+                    },
+                    "Send_Text_Message_(SMS)": {
+                        "inputs": {
+                            "body": {
+                                "body": "Alert! a tweet posted from  : @{triggerBody()?['UserDetails']?['UserName']} and \nthe content was :  [  @{triggerBody()?['TweetText']} ],   the \"sentiment-score\"  [  @{body('Detect_Sentiment')?['score']}  ]",
+                                "from": "+19286833163",
+                                "to": "+15035551212"
+                            },
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['twilio']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "path": "/Messages.json"
+                        },
+                        "runAfter": {
+                            "Compose": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection"
+                    }
+                },
+                "expression": {
+                    "and": [
+                        {
+                            "less": [
+                                "@body('Detect_Sentiment')?['score']",
+                                "@float('0.5')"
+                            ]
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Detect_Sentiment": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "If"
+            },
+            "Detect_Sentiment": {
+                "inputs": {
+                    "body": {
+                        "text": "@triggerBody()?['TweetText']"
+                    },
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['cognitiveservicestextanalytics']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "path": "/text/analytics/v2.1/sentiment"
+                },
+                "runAfter": {},
+                "type": "ApiConnection"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "defaultValue": {},
+                "type": "Object"
+            }
+        },
+        "triggers": {
+            "When_a_new_tweet_is_posted": {
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['twitter']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/onnewtweet",
+                    "queries": {
+                        "searchQuery": "from:@someEvilUser"
+                    }
+                },
+                "recurrence": {
+                    "frequency": "Day",
+                    "interval": 1
+                },
+                "splitOn": "@triggerBody()?['value']",
+                "type": "ApiConnection"
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "value": {
+                "cognitiveservicestextanalytics": {
+                    "connectionId": "/subscriptions/48bd0000test/resourceGroups/mySandbox/providers/Microsoft.Web/connections/cognitiveservicestextanalytics",
+                    "connectionName": "cognitiveservicestextanalytics",
+                    "id": "/subscriptions/48bd0000test/providers/Microsoft.Web/locations/westus/managedApis/cognitiveservicestextanalytics"
+                },
+                "twilio": {
+                    "connectionId": "/subscriptions/48bd0000test/resourceGroups/mySandbox/providers/Microsoft.Web/connections/twilio",
+                    "connectionName": "twilio",
+                    "id": "/subscriptions/48bd0000test/providers/Microsoft.Web/locations/westus/managedApis/twilio"
+                },
+                "twitter": {
+                    "connectionId": "/subscriptions/48bd0000test/resourceGroups/mySandbox/providers/Microsoft.Web/connections/twitter",
+                    "connectionName": "twitter",
+                    "id": "/subscriptions/48bd0000test/providers/Microsoft.Web/locations/westus/managedApis/twitter"
+                }
+            }
+        }
+    }
+}
